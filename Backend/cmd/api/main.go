@@ -9,33 +9,32 @@ import (
 	"time"
 
 	"hudeem-backend/internal/config"
+	"hudeem-backend/internal/handler"
+	"hudeem-backend/internal/orchestrator"
+	profilerepo "hudeem-backend/internal/repository/profile"
+	rationrepo "hudeem-backend/internal/repository/ration"
 
-	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
 	cfg := config.Load()
 
-	// TODO: инициализация после реализации repository/service/handler
-	// db, err := pgxpool.New(context.Background(), cfg.DSN)
-	// if err != nil {
-	//     log.Fatalf("connect db: %v", err)
-	// }
-	// defer db.Close()
-	//
-	// rationRepo := rationrepo.New(db)
-	// profileSvc := profilerepo.New(db)
-	// gigachatClient := gigachatclient.New(cfg.GigaChatURL, cfg.GigaChatToken)
-	// kuperClient := kuperclient.New(cfg.KuperBaseURL)
-	// gigachatSvc := gigachatsvc.New(gigachatClient)
-	// kuperSvc := kupersvc.New(kuperClient)
-	// orch := orchestrator.New(profileSvc, gigachatSvc, kuperSvc, rationRepo)
-	// router := handler.NewRouter(orch)
+	db, err := pgxpool.New(context.Background(), cfg.DSN)
+	if err != nil {
+		log.Fatalf("connect db: %v", err)
+	}
+	defer db.Close()
 
-	router := gin.Default()
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+	rationRepo := rationrepo.New(db)
+	profileRepo := profilerepo.New(db)
+
+	// GigaChat and Kuper services will be injected by other team members.
+	// For now, orchestrator accepts nil — handlers that don't need them still work.
+	orch := orchestrator.New(nil, nil, nil, rationRepo)
+
+	h := handler.NewHandler(orch, rationRepo, profileRepo)
+	router := handler.NewRouter(h)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
