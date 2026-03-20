@@ -1,6 +1,10 @@
 package model
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type KuperStore struct {
 	ID         uuid.UUID `db:"id"         json:"id"`
@@ -19,15 +23,36 @@ type KuperCart struct {
 	FoundCount    int       `db:"found_count"`
 	TotalCount    int       `db:"total_count"`
 	CheckoutURL   string    `db:"checkout_url"`
+	CreatedAt     time.Time `db:"created_at"`
 }
 
 type KuperCartItem struct {
 	ID               uuid.UUID `db:"id"`
 	CartID           uuid.UUID `db:"cart_id"`
 	IngredientID     uuid.UUID `db:"ingredient_id"`
-	IngredientName   string    `db:"-"           json:"ingredient_name"`
+	IngredientName   string    `db:"-"                  json:"ingredient_name"`
 	KuperProductID   string    `db:"kuper_product_id"`
 	KuperProductName string    `db:"kuper_product_name" json:"product_name"`
 	PriceRub         int       `db:"price_rub"          json:"price_rub"`
 	Found            bool      `db:"found"              json:"found"`
+}
+
+// DTO для Kuper API
+
+type KuperNearbyStore struct {
+	StoreID   string `json:"store_id"`
+	StoreName string `json:"store_name"`
+	DistanceM int    `json:"distance_m"`
+}
+
+type KuperSearchResult struct {
+	ProductID   string `json:"product_id"`
+	ProductName string `json:"product_name"`
+	PriceRub    int    `json:"price_rub"`
+	Found       bool   `json:"found"`
+}
+
+type KuperCartCreateResponse struct {
+	CartID      string `json:"cart_id"`
+	CheckoutURL string `json:"checkout_url"`
 }
