@@ -1,0 +1,30 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hudeem
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  mock-kuper:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    ports:
+      - "8081:8081"
+
+volumes:
+  pgdata:
