@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: ration
+      POSTGRES_PASSWORD: ration
+      POSTGRES_DB: ration_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d/migrations
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/00-init.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ration -d ration_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: ration
+      DB_PASSWORD: ration
+      DB_NAME: ration_db
+      SERVER_PORT: "8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
