@@ -94,6 +94,9 @@ func Build(profile *model.UserProfile, consumed []model.ConsumedMealDTO) (system
 4. Для каждого блюда укажи:
    - Название блюда
    - Калорийность
+   - Белки в граммах
+   - Жиры в граммах
+   - Углеводы в граммах
    - Список продуктов с дозировками (format: "мясо (500 г)").
 
 5. Продукты должны быть обычными продуктами из магазина.
@@ -106,7 +109,10 @@ func Build(profile *model.UserProfile, consumed []model.ConsumedMealDTO) (system
     {
       "meal_type": "lunch",
       "name": "Название блюда",
-      "kcal": 300
+      "kcal": 300,
+      "protein_g": 30,
+      "fat_g": 10,
+      "carbs_g": 40
     }
   ],
   "shopping_list": [

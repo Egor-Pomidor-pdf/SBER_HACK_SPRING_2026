@@ -18,6 +18,7 @@ import (
 // ProfileService — реализует Николай (repository/profile)
 type ProfileService interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*model.UserProfile, error)
+	DeductKBZHU(ctx context.Context, userID uuid.UUID, kcal, proteinG, fatG, carbsG int) error
 }
 
 // GigaChatService — реализует Илья С. (service/gigachat)
@@ -109,14 +110,23 @@ func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat
 	// Сохраняем meals
 	meals := make([]model.RationMeal, 0, len(plan.Meals))
 	totalKcal := 0
+	totalProtein := 0
+	totalFat := 0
+	totalCarbs := 0
 	for i, m := range plan.Meals {
-		totalKcal += m.Kcal
+		totalKcal    += m.Kcal
+		totalProtein += m.ProteinG
+		totalFat     += m.FatG
+		totalCarbs   += m.CarbsG
 		meals = append(meals, model.RationMeal{
 			ID:        uuid.New(),
 			RationID:  rationID,
 			MealType:  m.MealType,
 			Name:      m.Name,
 			Kcal:      m.Kcal,
+			ProteinG:  m.ProteinG,
+			FatG:      m.FatG,
+			CarbsG:    m.CarbsG,
 			SortOrder: i,
 		})
 	}
@@ -216,34 +226,40 @@ func (o *Orchestrator) checkProfileCompleteness(profile *model.UserProfile) []st
 
 // CreateCart — шаги 7–9 пайплайна
 func (o *Orchestrator) CreateCart(ctx context.Context, rationID, storeID uuid.UUID) (*model.CartResponse, error) {
-	// Получаем рацион и ингредиенты
+	// 1. Получить рацион
 	ration, err := o.rationRepo.GetRationByID(ctx, rationID)
 	if err != nil {
 		return nil, fmt.Errorf("get ration: %w", err)
 	}
 
+	// 2. Получить ингредиенты
 	ingredients, err := o.rationRepo.GetIngredientsByRationID(ctx, rationID)
 	if err != nil {
 		return nil, fmt.Errorf("get ingredients: %w", err)
 	}
 
-	// Находим store_id строкой для Купера
+	// 3. Получить магазин
 	store, err := o.rationRepo.GetStoreByID(ctx, storeID)
 	if err != nil {
 		return nil, fmt.Errorf("get store: %w", err)
 	}
 
-	// Шаг 8: параллельный поиск ингредиентов + создание корзины
+	// 4. Получить блюда рациона (нужны для суммирования КБЖУ)
+	meals, err := o.rationRepo.GetMealsByRationID(ctx, rationID)
+	if err != nil {
+		return nil, fmt.Errorf("get meals: %w", err)
+	}
+
+	// 5. Параллельный поиск всех ингредиентов (семафор 10)
 	const maxConcurrent = 10
 	sem := make(chan struct{}, maxConcurrent)
-
 	cartItems := make([]model.KuperCartItem, len(ingredients))
 	var mu sync.Mutex
 
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	for i, ing := range ingredients {
-		i, ing := i, ing // capture
+		i, ing := i, ing
 		eg.Go(func() error {
 			sem <- struct{}{}
 			defer func() { <-sem }()
@@ -268,27 +284,24 @@ func (o *Orchestrator) CreateCart(ctx context.Context, rationID, storeID uuid.UU
 		})
 	}
 
-	// Параллельно создаём корзину в Купере
-	var kuperCartID, checkoutURL string
-	eg.Go(func() error {
-		var foundItems []model.KuperCartItem
-		// Ждём пока поиск завершится — создаём корзину с тем что нашли
-		// Для МВП: создаём корзину сразу с пустым списком, Купер вернёт URL
-		id, url, err := o.kuperSvc.CreateCart(egCtx, store.StoreID, nil)
-		if err != nil {
-			return fmt.Errorf("create kuper cart: %w", err)
-		}
-		_ = foundItems
-		kuperCartID = id
-		checkoutURL = url
-		return nil
-	})
-
+	// 6. Дождаться поиска
 	if err := eg.Wait(); err != nil {
 		return nil, err
 	}
 
-	// Считаем итоги
+	// 7. Создать корзину с реальными найденными товарами
+	foundItems := make([]model.KuperCartItem, 0, len(cartItems))
+	for _, item := range cartItems {
+		if item.Found {
+			foundItems = append(foundItems, item)
+		}
+	}
+	kuperCartID, checkoutURL, err := o.kuperSvc.CreateCart(ctx, store.StoreID, foundItems)
+	if err != nil {
+		return nil, fmt.Errorf("create kuper cart: %w", err)
+	}
+
+	// 8. Посчитать итоги
 	totalPrice := 0
 	foundCount := 0
 	for _, item := range cartItems {
@@ -298,6 +311,16 @@ func (o *Orchestrator) CreateCart(ctx context.Context, rationID, storeID uuid.UU
 		}
 	}
 
+	// 9. Суммировать КБЖУ всех блюд рациона
+	totalKcal, totalProtein, totalFat, totalCarbs := 0, 0, 0, 0
+	for _, m := range meals {
+		totalKcal    += m.Kcal
+		totalProtein += m.ProteinG
+		totalFat     += m.FatG
+		totalCarbs   += m.CarbsG
+	}
+
+	// 10. Сохранить корзину в БД синхронно
 	cart := &model.KuperCart{
 		ID:            uuid.New(),
 		RationID:      rationID,
@@ -310,19 +333,21 @@ func (o *Orchestrator) CreateCart(ctx context.Context, rationID, storeID uuid.UU
 	for i := range cartItems {
 		cartItems[i].CartID = cart.ID
 	}
+	if err := o.rationRepo.SaveCart(ctx, cart, cartItems); err != nil {
+		return nil, fmt.Errorf("save cart: %w", err)
+	}
 
-	// Шаг 9: сохраняем
-	go func() {
-		saveCtx := context.Background()
-		if err := o.rationRepo.SaveCart(saveCtx, cart, cartItems); err != nil {
-			log.Printf("save cart: %v", err)
-		}
-		if err := o.rationRepo.UpdateRationStatus(saveCtx, rationID, "ordered"); err != nil {
-			log.Printf("update ration status: %v", err)
-		}
-	}()
+	// 11. Списать КБЖУ из профиля
+	if err := o.profileSvc.DeductKBZHU(ctx, ration.UserID, totalKcal, totalProtein, totalFat, totalCarbs); err != nil {
+		// Не блокируем ответ — логируем и продолжаем
+		log.Printf("deduct kbzhu: %v", err)
+	}
 
-	_ = ration
+	// 12. Обновить статус рациона → consumed
+	if err := o.rationRepo.UpdateRationStatus(ctx, rationID, "consumed"); err != nil {
+		log.Printf("update ration status: %v", err)
+	}
+
 	_ = kuperCartID
 
 	return &model.CartResponse{
