@@ -1,6 +1,11 @@
 package ready_meal
 
-import "context"
+import (
+	"context"
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // Repository — интерфейс репозитория готовых блюд
 type Repository interface {

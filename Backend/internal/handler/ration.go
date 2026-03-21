@@ -3,6 +3,8 @@ package handler
 import (
 	"net/http"
 
+	"hudeem-backend/internal/model"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

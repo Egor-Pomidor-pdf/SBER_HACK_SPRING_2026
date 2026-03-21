@@ -7,9 +7,12 @@ type MealPlan struct {
 }
 
 type MealPlanItem struct {
-	MealType string `json:"meal_type"`
-	Name     string `json:"name"`
-	Kcal     int    `json:"kcal"`
+	MealType  string `json:"meal_type"`
+	Name      string `json:"name"`
+	Kcal      int    `json:"kcal"`
+	ProteinG  int    `json:"protein_g"`
+	FatG      int    `json:"fat_g"`
+	CarbsG    int    `json:"carbs_g"`
 }
 
 type ShoppingListItem struct {

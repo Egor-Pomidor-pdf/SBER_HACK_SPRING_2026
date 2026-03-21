@@ -95,6 +95,19 @@ func (r *Repo) GetMealConsumptions(ctx context.Context, userID uuid.UUID) ([]mod
 	return result, rows.Err()
 }
 
+// DeductKBZHU вычитает КБЖУ из остатка пользователя (не уходит ниже 0)
+func (r *Repo) DeductKBZHU(ctx context.Context, userID uuid.UUID, kcal, proteinG, fatG, carbsG int) error {
+	_, err := r.db.Exec(ctx, `
+		UPDATE user_profiles SET
+			remaining_kcal      = GREATEST(0, remaining_kcal      - $1),
+			remaining_protein_g = GREATEST(0, remaining_protein_g - $2),
+			remaining_fat_g     = GREATEST(0, remaining_fat_g     - $3),
+			remaining_carbs_g   = GREATEST(0, remaining_carbs_g   - $4)
+		WHERE user_id = $5
+	`, kcal, proteinG, fatG, carbsG, userID)
+	return err
+}
+
 // CalculateTotalConsumedKcal считает общее потребление калорий
 func (r *Repo) CalculateTotalConsumedKcal(ctx context.Context, userID uuid.UUID) (int, error) {
 	row := r.db.QueryRow(ctx,

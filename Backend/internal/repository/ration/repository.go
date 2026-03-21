@@ -3,6 +3,7 @@ package ration
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"hudeem-backend/internal/model"
 
@@ -30,9 +31,9 @@ func (r *Repo) CreateRation(ctx context.Context, ration *model.DailyRation) erro
 func (r *Repo) CreateMeals(ctx context.Context, meals []model.RationMeal) error {
 	for _, m := range meals {
 		_, err := r.db.Exec(ctx,
-			`INSERT INTO ration_meals (id, ration_id, meal_type, name, kcal, sort_order)
-			 VALUES ($1, $2, $3, $4, $5, $6)`,
-			m.ID, m.RationID, m.MealType, m.Name, m.Kcal, m.SortOrder,
+			`INSERT INTO ration_meals (id, ration_id, meal_type, name, kcal, protein_g, fat_g, carbs_g, sort_order)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			m.ID, m.RationID, m.MealType, m.Name, m.Kcal, m.ProteinG, m.FatG, m.CarbsG, m.SortOrder,
 		)
 		if err != nil {
 			return fmt.Errorf("insert meal %s: %w", m.Name, err)
@@ -104,8 +105,8 @@ func (r *Repo) GetIngredientsByRationID(ctx context.Context, rationID uuid.UUID)
 
 func (r *Repo) GetMealsByRationID(ctx context.Context, rationID uuid.UUID) ([]model.RationMeal, error) {
 	rows, err := r.db.Query(ctx,
-		`SELECT id, ration_id, meal_type, name, kcal, sort_order
-		 FROM ration_meals WHERE ration_id = $1 ORDER BY sort_order`, rationID)
+		`SELECT id, ration_id, meal_type, name, kcal, protein_g, fat_g, carbs_g, sort_order
+		 FROM ration_meals WHERE ration_id = $1 ORDER BY sort_order ASC`, rationID)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +115,8 @@ func (r *Repo) GetMealsByRationID(ctx context.Context, rationID uuid.UUID) ([]mo
 	var result []model.RationMeal
 	for rows.Next() {
 		var m model.RationMeal
-		if err := rows.Scan(&m.ID, &m.RationID, &m.MealType, &m.Name, &m.Kcal, &m.SortOrder); err != nil {
+		if err := rows.Scan(&m.ID, &m.RationID, &m.MealType, &m.Name, &m.Kcal,
+			&m.ProteinG, &m.FatG, &m.CarbsG, &m.SortOrder); err != nil {
 			return nil, err
 		}
 		result = append(result, m)

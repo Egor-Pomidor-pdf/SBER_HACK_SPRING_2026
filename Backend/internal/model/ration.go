@@ -11,27 +11,30 @@ type DailyRation struct {
 	UserID      uuid.UUID `db:"user_id"`
 	RationDate  time.Time `db:"ration_date"`
 	TotalKcal   int       `db:"total_kcal"`
-	Status      string    `db:"status"` // generated / ordered
+	Status      string    `db:"status"` // generated / consumed
 	GigachatRaw string    `db:"gigachat_raw"`
 	CreatedAt   time.Time `db:"created_at"`
 }
 
 type RationMeal struct {
-	ID        uuid.UUID `db:"id"`
-	RationID  uuid.UUID `db:"ration_id"`
-	MealType  string    `db:"meal_type"` // breakfast / lunch / dinner / snack
-	Name      string    `db:"name"`
-	Kcal      int       `db:"kcal"`
-	SortOrder int       `db:"sort_order"`
+	ID        uuid.UUID `db:"id"         json:"id"`
+	RationID  uuid.UUID `db:"ration_id"  json:"-"`
+	MealType  string    `db:"meal_type"  json:"meal_type"` // breakfast / lunch / dinner / snack
+	Name      string    `db:"name"       json:"name"`
+	Kcal      int       `db:"kcal"       json:"kcal"`
+	ProteinG  int       `db:"protein_g"  json:"protein_g"`
+	FatG      int       `db:"fat_g"      json:"fat_g"`
+	CarbsG    int       `db:"carbs_g"    json:"carbs_g"`
+	SortOrder int       `db:"sort_order" json:"-"`
 }
 
 type RationIngredient struct {
-	ID        uuid.UUID `db:"id"`
-	RationID  uuid.UUID `db:"ration_id"`
-	Name      string    `db:"name"`
-	Quantity  string    `db:"quantity"`
-	Unit      string    `db:"unit"`
-	SortOrder int       `db:"sort_order"`
+	ID        uuid.UUID `db:"id"         json:"-"`
+	RationID  uuid.UUID `db:"ration_id"  json:"-"`
+	Name      string    `db:"name"       json:"name"`
+	Quantity  string    `db:"quantity"   json:"quantity"`
+	Unit      string    `db:"unit"       json:"unit"`
+	SortOrder int       `db:"sort_order" json:"-"`
 }
 
 // RationResponse — ответ на POST /api/v1/ration

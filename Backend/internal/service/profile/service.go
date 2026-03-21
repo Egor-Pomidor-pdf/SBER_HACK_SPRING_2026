@@ -2,7 +2,6 @@ package profile
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"hudeem-backend/internal/model"
@@ -19,6 +18,14 @@ func New(repo profilerepo.Repository) *ServiceImpl {
 
 func (s *ServiceImpl) GetByUserID(ctx context.Context, userID uuid.UUID) (*model.UserProfile, error) {
 	return s.repo.GetByUserID(ctx, userID)
+}
+
+func (s *ServiceImpl) UpdateProfile(ctx context.Context, profile *model.UserProfile) error {
+	return s.repo.Update(ctx, profile)
+}
+
+func (s *ServiceImpl) DeductKBZHU(ctx context.Context, userID uuid.UUID, kcal, proteinG, fatG, carbsG int) error {
+	return s.repo.DeductKBZHU(ctx, userID, kcal, proteinG, fatG, carbsG)
 }
 
 // GetRemainingKcal получает оставшиеся калории для пользователя

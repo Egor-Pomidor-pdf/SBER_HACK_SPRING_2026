@@ -16,4 +16,5 @@ type Repository interface {
 	UpdateRemainingKcal(ctx context.Context, userID uuid.UUID, deltaKcal int) error
 	GetMealConsumptions(ctx context.Context, userID uuid.UUID) ([]model.UserMealConsumption, error)
 	CalculateTotalConsumedKcal(ctx context.Context, userID uuid.UUID) (int, error)
+	DeductKBZHU(ctx context.Context, userID uuid.UUID, kcal, proteinG, fatG, carbsG int) error
 }

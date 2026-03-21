@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	kuperclient "hudeem-backend/internal/client/kuper"
+	"hudeem-backend/internal/calc"
 	"hudeem-backend/internal/model"
+	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -197,7 +199,7 @@ func (s *ServiceImpl) GetStoresForRation(
 		// Инициализируем структуру для доставки
 		delivery := model.StoreDelivery{
 			ID:              uuid.New(),
-			RationID:        "", // TODO: передать ration_id
+			RationID:        uuid.Nil, // TODO: передать ration_id
 			StoreID:         store.StoreID,
 			StoreName:       store.StoreName,
 			StoreAddress:    store.Address,
@@ -212,7 +214,7 @@ func (s *ServiceImpl) GetStoresForRation(
 		// Инициализируем структуру для ходьбы
 		walk := model.StoreWalk{
 			ID:              uuid.New(),
-			RationID:        "", // TODO: передать ration_id
+			RationID:        uuid.Nil, // TODO: передать ration_id
 			StoreID:         store.StoreID,
 			StoreName:       store.StoreName,
 			StoreAddress:    store.Address,
@@ -235,7 +237,7 @@ func (s *ServiceImpl) GetStoresForRation(
 		g, gctx := errgroup.WithContext(ctx)
 
 		for _, ing := range ingredients {
-			i, ing := i, ing
+			ing := ing
 			g.Go(func() error {
 				sem <- struct{}{}
 				defer func() { <-sem }()
