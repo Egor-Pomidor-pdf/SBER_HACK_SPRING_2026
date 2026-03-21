@@ -3,7 +3,7 @@ CREATE TABLE daily_rations (
     user_id      UUID NOT NULL,
     ration_date  DATE NOT NULL DEFAULT CURRENT_DATE,
     total_kcal   INT NOT NULL DEFAULT 0,
-    status       VARCHAR(20) NOT NULL DEFAULT 'generated',
+    status       VARCHAR(20) NOT NULL DEFAULT 'generated' CHECK (status IN ('generated', 'consumed')),
     gigachat_raw JSONB,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

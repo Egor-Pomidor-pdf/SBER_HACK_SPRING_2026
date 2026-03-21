@@ -10,5 +10,6 @@ import (
 
 type Service interface {
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*model.UserProfile, error)
-	Update(ctx context.Context, p *model.UserProfile) error
+	UpdateProfile(ctx context.Context, profile *model.UserProfile) error
+	DeductKBZHU(ctx context.Context, userID uuid.UUID, kcal, proteinG, fatG, carbsG int) error
 }
