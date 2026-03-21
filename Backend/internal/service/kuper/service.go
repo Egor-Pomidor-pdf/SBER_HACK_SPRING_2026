@@ -18,8 +18,50 @@ func NewService(client kuperclient.Client) *ServiceImpl {
 	return &ServiceImpl{client: client}
 }
 
-func (s *ServiceImpl) GetNearbyStores(ctx context.Context, lat, lng float64) ([]model.KuperNearbyStore, error) {
-	return s.client.GetNearbyStores(ctx, lat, lng, 5)
+func (s *ServiceImpl) GetNearbyStores(ctx context.Context, lat, lng float64) ([]model.KuperStore, error) {
+	nearby, err := s.client.GetNearbyStores(ctx, lat, lng, 5)
+	if err != nil {
+		return nil, err
+	}
+	stores := make([]model.KuperStore, 0, len(nearby))
+	for _, n := range nearby {
+		stores = append(stores, model.KuperStore{
+			StoreID:   n.StoreID,
+			StoreName: n.StoreName,
+			DistanceM: n.DistanceM,
+		})
+	}
+	return stores, nil
+}
+
+func (s *ServiceImpl) SearchProduct(ctx context.Context, storeID, query string) (*model.KuperCartItem, error) {
+	result, err := s.client.SearchProduct(ctx, query, storeID)
+	if err != nil {
+		return nil, err
+	}
+	if !result.Found {
+		return &model.KuperCartItem{Found: false}, nil
+	}
+	return &model.KuperCartItem{
+		KuperProductID:   result.ProductID,
+		KuperProductName: result.ProductName,
+		PriceRub:         result.PriceRub,
+		Found:            true,
+	}, nil
+}
+
+func (s *ServiceImpl) CreateCart(ctx context.Context, storeID string, items []model.KuperCartItem) (string, string, error) {
+	productIDs := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.Found {
+			productIDs = append(productIDs, item.KuperProductID)
+		}
+	}
+	resp, err := s.client.CreateCart(ctx, storeID, productIDs)
+	if err != nil {
+		return "", "", err
+	}
+	return resp.CartID, resp.CheckoutURL, nil
 }
 
 func (s *ServiceImpl) BuildCart(ctx context.Context, storeID string, ingredients []model.RationIngredient) (*BuildCartResult, error) {
