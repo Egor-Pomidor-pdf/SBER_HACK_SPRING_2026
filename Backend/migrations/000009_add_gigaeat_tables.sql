@@ -4,7 +4,7 @@
 -- Таблица истории потребления блюд
 CREATE TABLE IF NOT EXISTS user_meal_consumptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL,
     meal_type VARCHAR(50) NOT NULL,
     meal_name VARCHAR(255) NOT NULL,
     meal_kcal INTEGER NOT NULL,

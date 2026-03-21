@@ -107,12 +107,12 @@ func handleSearch(c *gin.Context) {
 	}
 
 	q := strings.ToLower(c.Query("q"))
-	storeID := c.Query("store_id")
+	_ = c.Query("store_id")
 
 	rows, err := db.Query(
 		`SELECT id, name, price_rub, unit, kcal, protein_g, fat_g, carbs_g, allergens
-		 FROM products WHERE name ILIKE $1 AND ($2 IS NULL OR store_id = $2) LIMIT 5`,
-		"%"+q+"%", storeID,
+		 FROM products WHERE name ILIKE ? LIMIT 1`,
+		"%"+q+"%",
 	)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -158,7 +158,11 @@ func handleSearch(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, results)
+	if len(results) > 0 {
+		c.JSON(http.StatusOK, results[0])
+	} else {
+		c.JSON(http.StatusOK, MockProductResponse{Found: false})
+	}
 }
 
 // POST /cart
@@ -175,7 +179,7 @@ func handleCreateCart(c *gin.Context) {
 	total := 0
 	for _, pid := range req.ProductIDs {
 		rows, err := db.Query(
-			`SELECT price_rub FROM products WHERE id = $1`,
+			`SELECT price_rub FROM products WHERE id = ?`,
 			pid,
 		)
 		if err != nil {

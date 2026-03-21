@@ -90,9 +90,22 @@ func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat
 		return nil, fmt.Errorf("generate meal plan: %w", err)
 	}
 
+	// Конвертируем ShoppingList в []model.RationIngredient
+	ingredients := make([]model.RationIngredient, 0, len(plan.ShoppingList))
+	for i, s := range plan.ShoppingList {
+		ingredients = append(ingredients, model.RationIngredient{
+			ID:        uuid.New(),
+			RationID:  rationID,
+			Name:      s.Name,
+			Quantity:  s.Quantity,
+			Unit:      s.Unit,
+			SortOrder: i,
+		})
+	}
+
 	// Шаг 4: получаем магазины для доставки и пешком
 	deliveryStores, walkStores, err := o.kuperSvc.GetStoresForRation(
-		ctx, lat, lng, plan.ShoppingList, profile.WeightKg)
+		ctx, lat, lng, ingredients, profile.WeightKg)
 	if err != nil {
 		return nil, fmt.Errorf("get stores: %w", err)
 	}

@@ -126,7 +126,7 @@ func insertProductsIfEmpty() error {
 	for _, p := range products {
 		_, err := db.Exec(
 			`INSERT INTO products (id, product_id, store_id, name, price_rub, unit, kcal, protein_g, fat_g, carbs_g, category, allergens)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			p.ID, p.ProductID, p.StoreID, p.Name, p.Price, p.Unit, p.Kcal, p.ProteinG, p.FatG, p.CarbsG, p.Category, p.Allergens,
 		)
 		if err != nil {

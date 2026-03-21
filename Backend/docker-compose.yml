@@ -11,7 +11,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
+      - ./migrations/init:/docker-entrypoint-initdb.d
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -25,6 +25,8 @@ services:
     environment:
       DSN: "postgres://postgres:postgres@postgres:5432/hudeem?sslmode=disable"
       KUPER_BASE_URL: "http://mock-kuper:8081"
+      GIGACHAT_TOKEN: "${GIGACHAT_TOKEN}"
+      GIGACHAT_URL: "${GIGACHAT_URL:-https://gigachat.devices.sberbank.ru/api/v1}"
     depends_on:
       postgres:
         condition: service_healthy

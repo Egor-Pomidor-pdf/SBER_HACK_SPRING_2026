@@ -31,31 +31,3 @@ type ReadyMealIngredient struct {
 	CarbsG       int       `db:"carbs_g" json:"carbs_g"`
 	Kcal         int       `db:"kcal" json:"kcal"`
 }
-
-// GigaeatReadyResponse — ответ на /api/v1/gigaeat/ready
-type GigaeatReadyResponse struct {
-	RationID   uuid.UUID                `json:"ration_id"`
-	RationDate string                   `json:"ration_date"`
-	TotalKcal  int                       `json:"total_kcal"`
-	Meals      []ReadyMeal              `json:"meals"`
-	Stores     []KuperStore             `json:"stores"`
-	Cart       GigaeatCartResponse      `json:"cart"`
-}
-
-// GigaeatCartResponse — корзина с фейковым checkout URL
-type GigaeatCartResponse struct {
-	CartID      string `json:"cart_id"`
-	StoreID     string `json:"store_id"`
-	CheckoutURL string `json:"checkout_url"` // Fake: https://kuper.ru/cart/mock
-}
-
-// UserMealConsumption — история потребления блюд
-type UserMealConsumption struct {
-	ID         uuid.UUID `db:"id" json:"id"`
-	UserID     uuid.UUID `db:"user_id" json:"user_id"`
-	MealType   string    `db:"meal_type" json:"meal_type"`
-	MealName   string    `db:"meal_name" json:"meal_name"`
-	MealKcal   int       `db:"meal_kcal" json:"meal_kcal"`
-	ConsumedAt time.Time `db:"consumed_at" json:"consumed_at"`
-	CreatedAt  time.Time `db:"created_at" json:"created_at"`
-}

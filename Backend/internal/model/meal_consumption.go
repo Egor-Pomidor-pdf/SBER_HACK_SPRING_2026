@@ -1,6 +1,10 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // UserMealConsumption — история потребления блюд
 type UserMealConsumption struct {
