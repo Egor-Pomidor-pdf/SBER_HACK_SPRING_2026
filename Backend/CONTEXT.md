@@ -384,8 +384,8 @@ PORT=8080
 |---|---|
 | Егор | Backend Lead: Handler, Orchestrator, DI, code review |
 | Николай | Repository, миграции, Docker, деплой |
-| Илья А. | KuperService, KuperClient, Mock Купера |
-| Илья С. | GigaChatService, GigaChatClient, PromptBuilder |
+| Илья С. | KuperService, KuperClient, Mock Купера |
+| Илья А. | GigaChatService, GigaChatClient, PromptBuilder |
 | Никита | Весь фронт (отдельный репо) |
 
 ---
@@ -401,3 +401,45 @@ PORT=8080
 7. **user_id без FK constraint** — не создаём зависимость от схемы Сбера
 8. **Логирование GigaChat response** — добавлено в service.go для дебага
 9. **System prompt улучшен** — добавлен строгий формат с примером JSON
+
+---
+
+## Статус МВП (протестировано 21.03.2026)
+
+Полный флоу работает:
+- POST /api/v1/ration → GigaChat генерирует рацион, возвращает 5 магазинов ✅
+- POST /api/v1/ration/:id/cart → формирует корзину, возвращает checkout_url ✅
+
+Тестовый пользователь для демо:
+- user_id: 550e8400-e29b-41d4-a716-446655440000
+- остаток: 1200 ккал, цель: lose, координаты: Москва 55.7512, 37.6184
+
+---
+
+## Известные проблемы
+
+- result.Choices[0] паникует если GigaChat вернул пустой массив — нужна проверка len > 0
+- mock/kuper/data.go — каталог не содержит все продукты которые генерирует GigaChat (минтай, сметана, зелёный лук, капуста) — found=false для них
+- docker-compose не передаёт GIGACHAT_TOKEN и GIGACHAT_URL через env по умолчанию — нужно добавить вручную
+- Ветки не смержены — feature/gigachat-integration ждёт мержа в main
+
+---
+
+## Быстрый старт
+
+1. Создать .env в папке Backend/ с GIGACHAT_TOKEN
+2. Добавить в docker-compose секцию api → environment: GIGACHAT_TOKEN, GIGACHAT_URL, KUPER_MOCK_URL
+3. docker-compose up --build
+4. curl http://localhost:8080/health → {"status":"ok"}
+
+---
+
+## Команда (фактическое распределение)
+
+| Участник | Зона |
+|---|---|
+| Егор | Backend Lead: Handler, Orchestrator, DI, code review |
+| Николай | Repository, миграции, Docker, деплой |
+| Илья А. | GigaChatService, GigaChatClient, PromptBuilder |
+| Илья С. | KuperService, KuperClient, Mock Купера |
+| Никита | Фронт |
