@@ -8,9 +8,10 @@ import (
 )
 
 type generateRationRequest struct {
-	UserID string  `json:"user_id" binding:"required"`
-	Lat    float64 `json:"lat" binding:"required"`
-	Lng    float64 `json:"lng" binding:"required"`
+	UserID        string                       `json:"user_id" binding:"required"`
+	Lat           float64                      `json:"lat" binding:"required"`
+	Lng           float64                      `json:"lng" binding:"required"`
+	ConsumedMeals []model.ConsumedMealDTO      `json:"consumed_meals" binding:"omitempty"`
 }
 
 func (h *Handler) GenerateRation(c *gin.Context) {
@@ -26,7 +27,7 @@ func (h *Handler) GenerateRation(c *gin.Context) {
 		return
 	}
 
-	resp, err := h.orch.GenerateRation(c.Request.Context(), userID, req.Lat, req.Lng)
+	resp, err := h.orch.GenerateRation(c.Request.Context(), userID, req.Lat, req.Lng, req.ConsumedMeals)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

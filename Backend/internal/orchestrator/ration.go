@@ -23,7 +23,7 @@ type ProfileService interface {
 // GigaChatService — реализует Илья С. (service/gigachat)
 // Возвращает: план питания, сырой JSON ответа, ошибку
 type GigaChatService interface {
-	GenerateMealPlan(ctx context.Context, profile *model.UserProfile) (*model.MealPlan, string, error)
+	GenerateMealPlan(ctx context.Context, profile *model.UserProfile, consumed []model.ConsumedMealDTO) (*model.MealPlan, string, error)
 }
 
 // KuperService — реализует Илья А. (service/kuper)
@@ -31,6 +31,7 @@ type KuperService interface {
 	GetNearbyStores(ctx context.Context, lat, lng float64) ([]model.KuperStore, error)
 	SearchProduct(ctx context.Context, storeID, query string) (*model.KuperCartItem, error)
 	CreateCart(ctx context.Context, storeID string, items []model.KuperCartItem) (cartID string, checkoutURL string, err error)
+	GetStoresForRation(ctx context.Context, lat, lng float64, ingredients []model.RationIngredient, weightKg float64) ([]model.StoreDelivery, []model.StoreWalk, error)
 }
 
 // RationRepository — реализует Николай (repository/ration)
@@ -44,6 +45,7 @@ type RationRepository interface {
 	GetStoreByID(ctx context.Context, id uuid.UUID) (*model.KuperStore, error)
 	SaveCart(ctx context.Context, cart *model.KuperCart, items []model.KuperCartItem) error
 	UpdateRationStatus(ctx context.Context, rationID uuid.UUID, status string) error
+	GetMealsByRationID(ctx context.Context, rationID uuid.UUID) ([]model.RationMeal, error)
 }
 
 // --- Orchestrator ---
@@ -69,43 +71,32 @@ func New(
 	}
 }
 
-// GenerateRation — шаги 1–6 пайплайна
-func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat, lng float64) (*model.RationResponse, error) {
-	// Шаг 2: параллельно получаем профиль и ближайшие магазины
-	var profile *model.UserProfile
-	var stores []model.KuperStore
-
-	eg, egCtx := errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		var err error
-		profile, err = o.profileSvc.GetByUserID(egCtx, userID)
-		if err != nil {
-			return fmt.Errorf("get profile: %w", err)
-		}
-		return nil
-	})
-
-	eg.Go(func() error {
-		var err error
-		stores, err = o.kuperSvc.GetNearbyStores(egCtx, lat, lng)
-		if err != nil {
-			return fmt.Errorf("get stores: %w", err)
-		}
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		return nil, err
+// GenerateRation — основной пайплайн для создания рациона
+func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat, lng float64, consumed []model.ConsumedMealDTO) (*model.RationResponse, error) {
+	// Шаг 1: получаем профиль
+	profile, err := o.profileSvc.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("get profile: %w", err)
 	}
 
-	// Шаг 3–4: генерируем рацион через GigaChat
-	plan, rawJSON, err := o.gigaSvc.GenerateMealPlan(ctx, profile)
+	// Шаг 2: проверяем полноту профиля
+	missingFields := o.checkProfileCompleteness(profile)
+	profileIncomplete := len(missingFields) > 0
+
+	// Шаг 3: генерируем рацион через GigaChat
+	plan, rawJSON, err := o.gigaSvc.GenerateMealPlan(ctx, profile, consumed)
 	if err != nil {
 		return nil, fmt.Errorf("generate meal plan: %w", err)
 	}
 
-	// Шаг 5: сохраняем в БД
+	// Шаг 4: получаем магазины для доставки и пешком
+	deliveryStores, walkStores, err := o.kuperSvc.GetStoresForRation(
+		ctx, lat, lng, plan.ShoppingList, profile.WeightKg)
+	if err != nil {
+		return nil, fmt.Errorf("get stores: %w", err)
+	}
+
+	// Шаг 5: сохраняем в БД синхронно
 	rationID := uuid.New()
 	ration := &model.DailyRation{
 		ID:          rationID,
@@ -115,6 +106,7 @@ func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat
 		GigachatRaw: rawJSON,
 	}
 
+	// Сохраняем meals
 	meals := make([]model.RationMeal, 0, len(plan.Meals))
 	totalKcal := 0
 	for i, m := range plan.Meals {
@@ -130,6 +122,7 @@ func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat
 	}
 	ration.TotalKcal = totalKcal
 
+	// Сохраняем ingredients
 	ingredients := make([]model.RationIngredient, 0, len(plan.ShoppingList))
 	for i, s := range plan.ShoppingList {
 		ingredients = append(ingredients, model.RationIngredient{
@@ -142,36 +135,83 @@ func (o *Orchestrator) GenerateRation(ctx context.Context, userID uuid.UUID, lat
 		})
 	}
 
-	for i := range stores {
-		stores[i].ID = uuid.New()
-		stores[i].RationID = rationID
+	// Сохраняем магазины (для совместимости храним как KuperStore)
+	for i := range deliveryStores {
+		deliveryStores[i].ID = uuid.New()
+		deliveryStores[i].RationID = rationID
+	}
+	for i := range walkStores {
+		walkStores[i].ID = uuid.New()
+		walkStores[i].RationID = rationID
 	}
 
-	// Сохраняем асинхронно — не блокируем ответ пользователю
-	go func() {
-		saveCtx := context.Background()
-		if err := o.rationRepo.CreateRation(saveCtx, ration); err != nil {
-			log.Printf("save ration: %v", err)
-			return
-		}
-		if err := o.rationRepo.CreateMeals(saveCtx, meals); err != nil {
-			log.Printf("save meals: %v", err)
-		}
-		if err := o.rationRepo.CreateIngredients(saveCtx, ingredients); err != nil {
-			log.Printf("save ingredients: %v", err)
-		}
-		if err := o.rationRepo.SaveStores(saveCtx, stores); err != nil {
-			log.Printf("save stores: %v", err)
-		}
-	}()
+	// Синхронное сохранение
+	if err := o.rationRepo.CreateRation(ctx, ration); err != nil {
+		return nil, fmt.Errorf("save ration: %w", err)
+	}
+	if err := o.rationRepo.CreateMeals(ctx, meals); err != nil {
+		return nil, fmt.Errorf("save meals: %w", err)
+	}
+	if err := o.rationRepo.CreateIngredients(ctx, ingredients); err != nil {
+		return nil, fmt.Errorf("save ingredients: %w", err)
+	}
 
-	// Шаг 6: ответ фронту
+	// Сохраняем магазины - объединяем delivery и walk
+	allStores := make([]model.KuperStore, 0, len(deliveryStores)+len(walkStores))
+	for _, s := range deliveryStores {
+		allStores = append(allStores, model.KuperStore{
+			ID:              s.ID,
+			RationID:        s.RationID,
+			StoreID:         s.StoreID,
+			StoreName:       s.StoreName,
+			DistanceM:       s.DistanceM,
+			StoreAddress:    s.StoreAddress,
+			DeliveryTimeMins: s.DeliveryTimeMins,
+		})
+	}
+	for _, s := range walkStores {
+		allStores = append(allStores, model.KuperStore{
+			ID:              s.ID,
+			RationID:        s.RationID,
+			StoreID:         s.StoreID,
+			StoreName:       s.StoreName,
+			DistanceM:       s.DistanceM,
+			StoreAddress:    s.StoreAddress,
+			DeliveryTimeMins: 0, // для walk магазинов время доставки не актуально
+		})
+	}
+
+	if err := o.rationRepo.SaveStores(ctx, allStores); err != nil {
+		return nil, fmt.Errorf("save stores: %w", err)
+	}
+
+	// Шаг 6: формируем ответ
 	return &model.RationResponse{
-		RationID:    rationID,
-		Meals:       meals,
-		Ingredients: ingredients,
-		Stores:      stores,
+		RationID:        rationID,
+		ProfileIncomplete: profileIncomplete,
+		MissingFields:    missingFields,
+		Meals:            meals,
+		Ingredients:      ingredients,
+		StoresDelivery:   deliveryStores,
+		StoresWalk:       walkStores,
 	}, nil
+}
+
+// checkProfileCompleteness проверяет, все ли необходимые поля заполнены
+func (o *Orchestrator) checkProfileCompleteness(profile *model.UserProfile) []string {
+	var missing []string
+
+	if profile.DietaryRestrictions == "" {
+		missing = append(missing, "dietary_restrictions")
+	}
+	if len(profile.Allergies) == 0 {
+		missing = append(missing, "allergies")
+	}
+	if len(profile.Preferences) == 0 {
+		missing = append(missing, "preferences")
+	}
+
+	return missing
 }
 
 // CreateCart — шаги 7–9 пайплайна

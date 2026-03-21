@@ -139,6 +139,10 @@ func (c *HTTPClient) Complete(ctx context.Context, systemPrompt, userPrompt stri
 		return "", err
 	}
 
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("gigachat returned empty choices")
+	}
+
 	content := result.Choices[0].Message.Content
 	content = strings.TrimSpace(content)
 

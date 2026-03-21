@@ -20,8 +20,8 @@ func New(client gigachatclient.Client) *ServiceImpl {
 	return &ServiceImpl{client: client}
 }
 
-func (s *ServiceImpl) GenerateMealPlan(ctx context.Context, profile *model.UserProfile) (*model.MealPlan, string, error) {
-	systemPrompt, userPrompt := prompt.Build(profile)
+func (s *ServiceImpl) GenerateMealPlan(ctx context.Context, profile *model.UserProfile, consumed []model.ConsumedMealDTO) (*model.MealPlan, string, error) {
+	systemPrompt, userPrompt := prompt.Build(profile, consumed)
 
 	response, err := s.client.Complete(ctx, systemPrompt, userPrompt)
 	if err != nil {

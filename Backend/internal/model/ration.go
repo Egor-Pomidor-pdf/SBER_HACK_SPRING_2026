@@ -36,10 +36,13 @@ type RationIngredient struct {
 
 // RationResponse — ответ на POST /api/v1/ration
 type RationResponse struct {
-	RationID    uuid.UUID          `json:"ration_id"`
-	Meals       []RationMeal       `json:"meals"`
-	Ingredients []RationIngredient `json:"ingredients"`
-	Stores      []KuperStore       `json:"stores"`
+	RationID        uuid.UUID             `json:"ration_id"`
+	ProfileIncomplete bool                `json:"profile_incomplete"`
+	MissingFields    []string              `json:"missing_fields"`
+	Meals            []RationMeal          `json:"meals"`
+	Ingredients      []RationIngredient    `json:"ingredients"`
+	StoresDelivery   []StoreDelivery       `json:"stores_delivery"`
+	StoresWalk       []StoreWalk           `json:"stores_walk"`
 }
 
 // CartResponse — ответ на POST /api/v1/ration/:id/cart
