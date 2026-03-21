@@ -11,8 +11,14 @@ import (
 	"hudeem-backend/internal/config"
 	"hudeem-backend/internal/handler"
 	"hudeem-backend/internal/orchestrator"
+	gigachatsvc "hudeem-backend/internal/service/gigachat"
+	kupersvc "hudeem-backend/internal/service/kuper"
 	profilerepo "hudeem-backend/internal/repository/profile"
 	rationrepo "hudeem-backend/internal/repository/ration"
+
+	gigachatclient "hudeem-backend/internal/client/gigachat"
+	kuperclient "hudeem-backend/internal/client/kuper"
+	profilesvc "hudeem-backend/internal/service/profile"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,9 +35,14 @@ func main() {
 	rationRepo := rationrepo.New(db)
 	profileRepo := profilerepo.New(db)
 
-	// GigaChat and Kuper services will be injected by other team members.
-	// For now, orchestrator accepts nil — handlers that don't need them still work.
-	orch := orchestrator.New(nil, nil, nil, rationRepo)
+	gcClient := gigachatclient.New(cfg.GigaChatURL, cfg.GigaChatToken)
+	kuperClient := kuperclient.NewHTTPClient()
+
+	gigaSvc := gigachatsvc.New(gcClient)
+	kuperSvc := kupersvc.NewService(kuperClient)
+	profileSvc := profilesvc.New(profileRepo)
+
+	orch := orchestrator.New(profileSvc, gigaSvc, kuperSvc, rationRepo)
 
 	h := handler.NewHandler(orch, rationRepo, profileRepo)
 	router := handler.NewRouter(h)
