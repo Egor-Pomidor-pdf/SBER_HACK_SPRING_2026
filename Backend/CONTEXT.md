@@ -15,13 +15,13 @@
 
 | Компонент | Решение |
 |---|---|
-| Язык | Go 1.22 |
+| Язык | Go 1.25 |
 | HTTP фреймворк | gin |
 | БД | PostgreSQL 15 |
 | Драйвер БД | pgx v5 |
 | Миграции | golang-migrate |
 | Конфиг | .env + godotenv |
-| Логирование | slog или zap |
+| Логирование | стандартный `log` пакет (пока) |
 | LLM | GigaChat API (реальный) |
 | Доставка | Купер API (mock) |
 
@@ -232,7 +232,7 @@ found               bool      -- false = не найдено в этом маг�
 
 ## Промпт GigaChat
 
-### System prompt
+### System prompt (актуальный)
 ```
 Ты — персональный нутрициолог. Составь рацион питания на день.
 Цель пользователя: {goal} (lose=похудеть, maintain=держать, gain=набрать).
@@ -244,15 +244,26 @@ found               bool      -- false = не найдено в этом маг�
 3. Составь список ингредиентов для всех блюд.
 4. Только обычные продукты из магазина.
 5. Отвечай ТОЛЬКО валидным JSON. Никакого текста до или после.
+
+Строго используй этот формат ответа:
+{
+  "meals": [
+    {"meal_type": "breakfast", "name": "Название блюда", "kcal": 300}
+  ],
+  "shopping_list": [
+    {"name": "продукт", "quantity": "100", "unit": "г"}
+  ]
+}
 ```
 
 ### User prompt
 ```
 Остаток КБЖУ на сегодня:
-- Калории: {remaining_kcal} ккал
-- Белки:   {remaining_protein_g} г
-- Жиры:    {remaining_fat_g} г
-- Углеводы:{remaining_carbs_g} г
+
+Калории: {remaining_kcal} ккал
+Белки:   {remaining_protein_g} г
+Жиры:    {remaining_fat_g} г
+Углеводы:{remaining_carbs_g} г
 
 Составь рацион на оставшуюся часть дня.
 ```
@@ -273,6 +284,7 @@ found               bool      -- false = не найдено в этом маг�
 - Если ответ не JSON → 1 автоматический retry
 - Если снова не JSON → вернуть 503, не пытаться парсить текст
 - Всегда сохранять `gigachat_raw` в БД до парсинга
+- **Логирование**: добавлено логирование raw response в `internal/service/gigachat/service.go:32`
 
 ---
 
@@ -346,6 +358,26 @@ hudeem-backend/
 
 ---
 
+## Конфигурация
+
+### .env файл
+```
+GIGACHAT_TOKEN=<токен от GigaChat>
+GIGACHAT_URL=https://gigachat.devices.sberbank.ru/api/v1
+DSN=postgres://postgres:postgres@localhost:5432/hudeem?sslmode=disable
+KUPER_BASE_URL=http://mock-kuper:8081
+PORT=8080
+```
+
+### Docker Compose
+- **postgres**: PostgreSQL 15, порт 5432
+- **api**: основной сервис, порт 8080
+- **mock-kuper**: mock сервер Купера, порт 8081
+
+Миграции применяются автоматически при старте контейнера postgres.
+
+---
+
 ## Команда
 
 | Участник | Зона |
@@ -367,3 +399,5 @@ hudeem-backend/
 5. **Запись в БД после ответа пользователю** — не блокирует latency
 6. **found=false вместо удаления** — показываем «не найдено» в UI
 7. **user_id без FK constraint** — не создаём зависимость от схемы Сбера
+8. **Логирование GigaChat response** — добавлено в service.go для дебага
+9. **System prompt улучшен** — добавлен строгий формат с примером JSON
